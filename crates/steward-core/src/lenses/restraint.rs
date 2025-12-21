@@ -32,6 +32,7 @@ use crate::types::{
     EvaluationRequest, LensFinding, LensState, LensType, RuleEvaluation, RuleResult,
 };
 
+use super::domain_patterns::{check_domain_patterns, DomainMatch, PatternSeverity};
 use super::Lens;
 
 lazy_static! {
@@ -102,6 +103,11 @@ pub struct RestraintLens;
 impl RestraintLens {
     pub fn new() -> Self {
         Self
+    }
+
+    /// Check for domain-specific patterns based on policy pack.
+    fn check_domain_specific(&self, content: &str, policy_packs: &[String]) -> Vec<DomainMatch> {
+        check_domain_patterns(content, policy_packs)
     }
 
     /// Check if output contains PII.
@@ -552,6 +558,91 @@ impl Lens for RestraintLens {
                     evidence: vec![],
                     rationale: Some("Rule type not matched to specific check".to_string()),
                 });
+            }
+        }
+
+        // Check domain-specific patterns based on policy_pack
+        let policy_packs = &contract.policy_pack;
+        if !policy_packs.is_empty() {
+            let domain_matches = self.check_domain_specific(content, policy_packs);
+
+            for domain_match in domain_matches {
+                let evidence = vec![Evidence::from_output(
+                    format!(
+                        "{} {} detected",
+                        domain_match.domain, domain_match.description
+                    ),
+                    domain_match.start,
+                    domain_match.end,
+                )];
+
+                // Use severity directly from pattern definition - no hardcoded matching needed
+                match domain_match.severity {
+                    PatternSeverity::Blocking => {
+                        rules_evaluated.push(RuleEvaluation {
+                            rule_id: format!("DOMAIN_{}", domain_match.pattern_type.to_uppercase()),
+                            rule_text: Some(format!(
+                                "{} {} exposure",
+                                domain_match.domain, domain_match.description
+                            )),
+                            result: RuleResult::Violated,
+                            evidence: evidence.clone(),
+                            rationale: Some(format!(
+                                "Domain-specific {} pattern detected at {}:{}",
+                                domain_match.pattern_type, domain_match.start, domain_match.end
+                            )),
+                        });
+
+                        if blocked_violation.is_none() {
+                            blocked_violation = Some((
+                                format!("DOMAIN_{}", domain_match.pattern_type.to_uppercase()),
+                                format!(
+                                    "{} {} exposed in response",
+                                    domain_match.domain, domain_match.description
+                                ),
+                                evidence,
+                            ));
+                        }
+                    }
+                    PatternSeverity::Escalating => {
+                        rules_evaluated.push(RuleEvaluation {
+                            rule_id: format!("DOMAIN_{}", domain_match.pattern_type.to_uppercase()),
+                            rule_text: Some(format!(
+                                "{} {} concern",
+                                domain_match.domain, domain_match.description
+                            )),
+                            result: RuleResult::Uncertain,
+                            evidence,
+                            rationale: Some(format!(
+                                "Domain-specific {} pattern may require review",
+                                domain_match.pattern_type
+                            )),
+                        });
+
+                        if escalate_reason.is_none() {
+                            escalate_reason = Some(format!(
+                                "{} {} detected - requires review",
+                                domain_match.domain, domain_match.description
+                            ));
+                        }
+                    }
+                    PatternSeverity::Informational => {
+                        // Log for audit but don't affect outcome
+                        rules_evaluated.push(RuleEvaluation {
+                            rule_id: format!("DOMAIN_{}", domain_match.pattern_type.to_uppercase()),
+                            rule_text: Some(format!(
+                                "{} {} reference",
+                                domain_match.domain, domain_match.description
+                            )),
+                            result: RuleResult::Satisfied,
+                            evidence,
+                            rationale: Some(format!(
+                                "Informational {} pattern logged for audit",
+                                domain_match.pattern_type
+                            )),
+                        });
+                    }
+                }
             }
         }
 

@@ -13,12 +13,14 @@
 mod accountability;
 mod boundaries;
 mod dignity;
+pub mod domain_patterns;
 mod restraint;
 mod transparency;
 
 pub use accountability::AccountabilityLens;
 pub use boundaries::BoundariesLens;
 pub use dignity::DignityLens;
+pub use domain_patterns::{check_domain_patterns, DomainMatch, PatternSeverity};
 pub use restraint::RestraintLens;
 pub use transparency::TransparencyLens;
 
