@@ -1,0 +1,23 @@
+[package]
+name = "steward-bindings-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Language-agnostic binding infrastructure for Steward"
+repository.workspace = true
+keywords = ["stewardship", "governance", "ai", "bindings", "ffi"]
+categories = ["api-bindings", "development-tools::ffi"]
+
+[lib]
+name = "steward_bindings_core"
+
+[dependencies]
+steward-core = { path = "../../crates/steward-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

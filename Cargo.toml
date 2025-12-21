@@ -4,8 +4,10 @@ members = [
     "crates/steward-core",
     "crates/steward-cli",
     "crates/steward-runtime",
+    "bindings/core",
     "bindings/python",
     "bindings/node",
+    "bindings/julia",
 ]
 
 [workspace.package]
@@ -55,3 +57,4 @@ proptest = "1.6"
 # Internal crates
 steward-core = { path = "crates/steward-core" }
 steward-runtime = { path = "crates/steward-runtime" }
+steward-bindings-core = { path = "bindings/core" }

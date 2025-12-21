@@ -2,6 +2,11 @@
 //!
 //! This module exposes the core Steward types and evaluation functions
 //! to Node.js, enabling `npm install @steward/core` usage.
+//!
+//! ## Design
+//!
+//! **Bindings do not define semantics.** All evaluation logic lives in
+//! `steward-core`. These are thin napi-rs wrappers for FFI marshalling.
 
 #![deny(clippy::all)]
 
@@ -13,6 +18,10 @@ use steward_core::{
     self as core, EvidenceSource as CoreEvidenceSource, LensState as CoreLensState,
     LensType as CoreLensType, RuleResult as CoreRuleResult, State as CoreState,
 };
+
+// Shared binding infrastructure (test fixtures, IR types)
+#[allow(unused_imports)]
+use steward_bindings_core::ToIR;
 
 /// Lens types for categorizing findings.
 /// Ordered alphabetically to match steward-core's Ord implementation.

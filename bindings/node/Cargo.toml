@@ -15,6 +15,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 steward-core = { path = "../../crates/steward-core" }
+steward-bindings-core = { path = "../core" }
 napi = { version = "2.16", default-features = false, features = ["napi8", "serde-json"] }
 napi-derive = "2.16"
 serde_json = { workspace = true }

@@ -2,6 +2,11 @@
 //!
 //! This module exposes the core Steward types and evaluation functions
 //! to Python, enabling `pip install steward` usage.
+//!
+//! ## Design
+//!
+//! **Bindings do not define semantics.** All evaluation logic lives in
+//! `steward-core`. These are thin PyO3 wrappers for FFI marshalling.
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -12,6 +17,10 @@ use steward_core::{
     self as core, EvidenceSource as CoreEvidenceSource, LensState as CoreLensState,
     LensType as CoreLensType, RuleResult as CoreRuleResult, State as CoreState,
 };
+
+// Shared binding infrastructure (test fixtures, IR types)
+#[allow(unused_imports)]
+use steward_bindings_core::ToIR;
 
 /// Python-compatible wrapper for Contract.
 #[pyclass(name = "Contract")]
