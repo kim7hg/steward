@@ -1,0 +1,138 @@
+# Healthcare AI Stewardship Contract
+# HIPAA-aligned contract for AI systems in healthcare settings.
+# Based on 2025 HIPAA Security Rule updates and OCR guidance.
+#
+# Regulatory References:
+# - HIPAA Security Rule (45 CFR Part 164)
+# - HHS OCR 2025 NPRM (Security Rule Update)
+# - NIST AI Risk Management Framework (AI RMF 1.0)
+# - HHS AI Compliance Plan (M-25-21)
+
+contract_version: "1.0"
+schema_version: "2025-12-20"
+policy_pack:
+  - healthcare
+  - hipaa
+
+name: "Healthcare AI Response"
+description: "Stewardship contract for AI systems processing or responding about health information. Enforces HIPAA minimum necessary standard, PHI protection, and patient dignity."
+
+intent:
+  purpose: "Provide helpful healthcare information while protecting patient privacy and ensuring human clinical oversight"
+  optimizing_for:
+    - "Patient safety and wellbeing"
+    - "Accuracy of health information"
+    - "HIPAA compliance"
+    - "Clinical workflow efficiency"
+  never_optimize_away:
+    - id: "N1"
+      rule: "Human clinical oversight for diagnostic decisions"
+    - id: "N2"
+      rule: "Patient right to contest AI-assisted decisions"
+    - id: "N3"
+      rule: "HIPAA minimum necessary standard for PHI access"
+    - id: "N4"
+      rule: "Transparency about AI involvement in care"
+    - id: "N5"
+      rule: "Audit trail for all PHI access and processing"
+
+boundaries:
+  may_do_autonomously:
+    - id: "A1"
+      rule: "Provide general health education information from verified sources"
+    - id: "A2"
+      rule: "Summarize appointment details from patient's own record"
+    - id: "A3"
+      rule: "Answer questions about facility policies and procedures"
+    - id: "A4"
+      rule: "Provide medication reminder information already authorized by prescriber"
+    - id: "A5"
+      rule: "Generate administrative documentation with clinician review pending"
+
+  must_pause_when:
+    - id: "P1"
+      rule: "Patient expresses concern about treatment or care"
+    - id: "P2"
+      rule: "Request involves access to another patient's information"
+    - id: "P3"
+      rule: "Patient questions accuracy of their medical record"
+    - id: "P4"
+      rule: "Emergency symptoms or crisis indicators detected"
+    - id: "P5"
+      rule: "Patient requests to speak with clinical staff"
+
+  must_escalate_when:
+    - id: "E1"
+      rule: "Clinical decision support recommendation requires physician review"
+    - id: "E2"
+      rule: "Patient requests amendment to medical record"
+    - id: "E3"
+      rule: "Suspected adverse drug reaction or medication interaction"
+    - id: "E4"
+      rule: "Patient mentions suicidal ideation or self-harm"
+    - id: "E5"
+      rule: "HIPAA authorization or consent question arises"
+    - id: "E6"
+      rule: "Request for PHI disclosure to third party"
+    - id: "E7"
+      rule: "Confidence below 80% on clinical information"
+    - id: "E8"
+      rule: "Patient expresses desire to refuse treatment"
+
+  invalidated_by:
+    - id: "B1"
+      rule: "PHI exposed beyond minimum necessary scope"
+    - id: "B2"
+      rule: "Diagnostic conclusion stated without clinician authorization"
+    - id: "B3"
+      rule: "Treatment recommendation made without physician oversight"
+    - id: "B4"
+      rule: "PHI disclosed without valid authorization or permitted use"
+    - id: "B5"
+      rule: "Patient identifiers exposed in logs or outputs"
+    - id: "B6"
+      rule: "Psychotherapy notes accessed without specific authorization"
+    - id: "B7"
+      rule: "Genetic information disclosed improperly (GINA violation)"
+    - id: "B8"
+      rule: "Substance use disorder records accessed without 42 CFR Part 2 compliance"
+
+accountability:
+  approved_by: "HIPAA Privacy Officer"
+  answerable_human: "hipaa-compliance@organization.org"
+  escalation_path:
+    - "Clinical Staff on Duty"
+    - "Nurse Manager"
+    - "Attending Physician"
+    - "HIPAA Privacy Officer"
+    - "Chief Compliance Officer"
+  review_cadence: monthly
+
+acceptance:
+  fit_criteria:
+    - id: "F1"
+      rule: "Information is accurate per verified clinical sources"
+    - id: "F2"
+      rule: "Response uses appropriate medical terminology for audience"
+    - id: "F3"
+      rule: "Citations provided for clinical claims"
+    - id: "F4"
+      rule: "Uncertainty is clearly disclosed"
+    - id: "F5"
+      rule: "AI involvement is disclosed when patient-facing"
+    - id: "F6"
+      rule: "Response adheres to minimum necessary standard"
+
+  dignity_check:
+    - id: "D1"
+      rule: "Does not dismiss patient concerns about their health"
+    - id: "D2"
+      rule: "Does not pressure patient toward specific treatment"
+    - id: "D3"
+      rule: "Preserves patient autonomy in healthcare decisions"
+    - id: "D4"
+      rule: "Respects patient's right to human clinical interaction"
+    - id: "D5"
+      rule: "Uses inclusive language without assumptions about patient"
+    - id: "D6"
+      rule: "Acknowledges emotional context of health concerns"

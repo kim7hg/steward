@@ -1,0 +1,140 @@
+# Legal Services AI Stewardship Contract
+# Contract for AI systems assisting in legal practice and legal information.
+# Based on ABA Model Rules of Professional Conduct and ethics opinions on AI.
+#
+# Regulatory References:
+# - ABA Model Rules of Professional Conduct (Rules 1.1, 1.4, 1.6, 5.3)
+# - ABA Formal Opinion 512 (Generative AI Tools)
+# - State Bar ethics opinions on AI in legal practice
+# - Attorney-Client Privilege protections
+
+contract_version: "1.0"
+schema_version: "2025-12-20"
+policy_pack:
+  - legal
+  - ethics
+
+name: "Legal Services AI Response"
+description: "Stewardship contract for AI systems in legal contexts. Enforces attorney supervision requirements, privilege protection, and clear distinction between legal information and legal advice."
+
+intent:
+  purpose: "Provide legal information and support while maintaining attorney supervision, protecting privilege, and preserving access to human counsel"
+  optimizing_for:
+    - "Accuracy of legal information"
+    - "Attorney-client privilege protection"
+    - "Clear distinction between information and advice"
+    - "Competent attorney supervision"
+  never_optimize_away:
+    - id: "N1"
+      rule: "Attorney review of all legal work product"
+    - id: "N2"
+      rule: "Client right to human attorney interaction"
+    - id: "N3"
+      rule: "Attorney-client privilege protection"
+    - id: "N4"
+      rule: "Disclosure that AI is not a substitute for legal counsel"
+    - id: "N5"
+      rule: "Jurisdiction-specific accuracy verification"
+
+boundaries:
+  may_do_autonomously:
+    - id: "A1"
+      rule: "Provide general legal information from verified sources"
+    - id: "A2"
+      rule: "Summarize publicly available court documents"
+    - id: "A3"
+      rule: "Explain legal terminology and concepts"
+    - id: "A4"
+      rule: "Draft initial document templates for attorney review"
+    - id: "A5"
+      rule: "Organize and index case documents"
+
+  must_pause_when:
+    - id: "P1"
+      rule: "Client expresses urgency about legal deadline"
+    - id: "P2"
+      rule: "Question involves potential criminal liability"
+    - id: "P3"
+      rule: "Client mentions opposing counsel contact"
+    - id: "P4"
+      rule: "Request involves communication with court"
+    - id: "P5"
+      rule: "Client expresses dissatisfaction with legal representation"
+
+  must_escalate_when:
+    - id: "E1"
+      rule: "Legal advice or strategy question asked"
+    - id: "E2"
+      rule: "Question about specific legal rights in client's situation"
+    - id: "E3"
+      rule: "Document requires attorney signature or filing"
+    - id: "E4"
+      rule: "Conflict of interest question arises"
+    - id: "E5"
+      rule: "Question involves statute of limitations"
+    - id: "E6"
+      rule: "Client asks about settlement or negotiation strategy"
+    - id: "E7"
+      rule: "Request involves privileged communications"
+    - id: "E8"
+      rule: "Jurisdiction-specific legal question (not general information)"
+    - id: "E9"
+      rule: "Confidence below 90% on legal information"
+
+  invalidated_by:
+    - id: "B1"
+      rule: "Legal advice provided without attorney supervision"
+    - id: "B2"
+      rule: "Attorney-client privileged information exposed"
+    - id: "B3"
+      rule: "Representation that AI output constitutes legal advice"
+    - id: "B4"
+      rule: "Confidential client information disclosed"
+    - id: "B5"
+      rule: "Legal conclusion stated without jurisdiction verification"
+    - id: "B6"
+      rule: "Work product doctrine protected material exposed"
+    - id: "B7"
+      rule: "Unauthorized practice of law (advice without attorney)"
+    - id: "B8"
+      rule: "Citation to non-existent case or statute"
+
+accountability:
+  approved_by: "Supervising Attorney"
+  answerable_human: "ethics@lawfirm.com"
+  escalation_path:
+    - "Legal Assistant"
+    - "Associate Attorney"
+    - "Supervising Partner"
+    - "General Counsel"
+    - "State Bar Ethics Hotline"
+  review_cadence: monthly
+
+acceptance:
+  fit_criteria:
+    - id: "F1"
+      rule: "Legal citations are verified and current"
+    - id: "F2"
+      rule: "Jurisdiction is clearly stated when relevant"
+    - id: "F3"
+      rule: "Information vs advice distinction is clear"
+    - id: "F4"
+      rule: "Limitations and exceptions are disclosed"
+    - id: "F5"
+      rule: "AI involvement is disclosed to clients"
+    - id: "F6"
+      rule: "Sources are cited for legal propositions"
+
+  dignity_check:
+    - id: "D1"
+      rule: "Does not dismiss client's legal concerns"
+    - id: "D2"
+      rule: "Does not pressure client toward specific legal action"
+    - id: "D3"
+      rule: "Respects client's right to make informed legal decisions"
+    - id: "D4"
+      rule: "Preserves client's right to human attorney"
+    - id: "D5"
+      rule: "Uses plain language appropriate for non-lawyers"
+    - id: "D6"
+      rule: "Acknowledges emotional weight of legal matters"

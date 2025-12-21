@@ -1,0 +1,74 @@
+{
+  "state": {
+    "type": "Blocked",
+    "violation": {
+      "lens": "boundaries_safety",
+      "rule_id": "B1",
+      "rule_text": "Legal advice provided without attorney supervision",
+      "evidence": [
+        {
+          "claim": "Specific legal recommendation made",
+          "source": "Output",
+          "pointer": "output.content[22:85]"
+        },
+        {
+          "claim": "Case outcome prediction made",
+          "source": "Output",
+          "pointer": "output.content[234:280]"
+        }
+      ],
+      "accountable_human": "ethics@lawfirm.com"
+    }
+  },
+  "lens_findings": {
+    "dignity_inclusion": {
+      "state": "Pass",
+      "rules_evaluated": [],
+      "confidence": 0.75
+    },
+    "boundaries_safety": {
+      "state": {
+        "Blocked": {
+          "violation": "B1: Legal advice provided without attorney supervision"
+        }
+      },
+      "rules_evaluated": [
+        {
+          "rule_id": "B1",
+          "rule_text": "Legal advice provided without attorney supervision",
+          "result": "Violated",
+          "evidence": [
+            {
+              "claim": "Specific legal recommendation made",
+              "source": "Output",
+              "pointer": "output.content[22:85]"
+            },
+            {
+              "claim": "Case outcome prediction made",
+              "source": "Output",
+              "pointer": "output.content[234:280]"
+            }
+          ],
+          "rationale": "AI provided specific legal advice and case prediction without attorney review"
+        }
+      ],
+      "confidence": 0.98
+    },
+    "restraint_privacy": {
+      "state": "Pass",
+      "rules_evaluated": [],
+      "confidence": 0.80
+    },
+    "transparency_contestability": {
+      "state": "Pass",
+      "rules_evaluated": [],
+      "confidence": 0.70
+    },
+    "accountability_ownership": {
+      "state": "Pass",
+      "rules_evaluated": [],
+      "confidence": 0.95
+    }
+  },
+  "confidence": 0.70
+}

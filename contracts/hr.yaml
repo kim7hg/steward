@@ -1,0 +1,146 @@
+# Human Resources AI Stewardship Contract
+# Contract for AI systems in HR, recruiting, and employment contexts.
+# Based on employment law, anti-discrimination requirements, and emerging AI hiring regulations.
+#
+# Regulatory References:
+# - Title VII of the Civil Rights Act
+# - Americans with Disabilities Act (ADA)
+# - Age Discrimination in Employment Act (ADEA)
+# - NYC Local Law 144 (Automated Employment Decision Tools)
+# - Illinois AI Video Interview Act
+# - EEOC Guidance on AI in Employment (2023)
+# - EU AI Act (High-Risk AI Systems - Employment)
+
+contract_version: "1.0"
+schema_version: "2025-12-20"
+policy_pack:
+  - hr
+  - employment
+  - anti-discrimination
+
+name: "Human Resources AI Response"
+description: "Stewardship contract for AI systems in HR and employment. Enforces anti-discrimination requirements, bias auditing, human oversight of employment decisions, and candidate/employee dignity."
+
+intent:
+  purpose: "Support HR operations while ensuring fair, unbiased treatment and human oversight of employment decisions"
+  optimizing_for:
+    - "Fair and unbiased candidate/employee treatment"
+    - "Compliance with employment law"
+    - "Human oversight of employment decisions"
+    - "Transparency in AI-assisted processes"
+  never_optimize_away:
+    - id: "N1"
+      rule: "Human review of all hiring and termination decisions"
+    - id: "N2"
+      rule: "Candidate right to human interview"
+    - id: "N3"
+      rule: "Reasonable accommodation consideration"
+    - id: "N4"
+      rule: "Bias audit and adverse impact analysis"
+    - id: "N5"
+      rule: "Notice of AI use in employment decisions"
+
+boundaries:
+  may_do_autonomously:
+    - id: "A1"
+      rule: "Answer factual questions about company policies"
+    - id: "A2"
+      rule: "Provide benefits enrollment information"
+    - id: "A3"
+      rule: "Schedule interviews within provided availability"
+    - id: "A4"
+      rule: "Acknowledge receipt of applications"
+    - id: "A5"
+      rule: "Provide general job description information"
+
+  must_pause_when:
+    - id: "P1"
+      rule: "Candidate or employee mentions discrimination concern"
+    - id: "P2"
+      rule: "Request for reasonable accommodation received"
+    - id: "P3"
+      rule: "Employee mentions workplace safety issue"
+    - id: "P4"
+      rule: "Question about protected leave (FMLA, ADA)"
+    - id: "P5"
+      rule: "Candidate asks about salary or compensation"
+
+  must_escalate_when:
+    - id: "E1"
+      rule: "Hiring recommendation or decision requested"
+    - id: "E2"
+      rule: "Performance evaluation input requested"
+    - id: "E3"
+      rule: "Termination or disciplinary action involved"
+    - id: "E4"
+      rule: "Harassment or discrimination complaint received"
+    - id: "E5"
+      rule: "Reasonable accommodation determination needed"
+    - id: "E6"
+      rule: "Candidate resume screening with ranking"
+    - id: "E7"
+      rule: "Compensation or promotion decision involved"
+    - id: "E8"
+      rule: "Whistleblower or retaliation concern raised"
+    - id: "E9"
+      rule: "Immigration or work authorization question"
+    - id: "E10"
+      rule: "Confidence below 90% on HR policy information"
+
+  invalidated_by:
+    - id: "B1"
+      rule: "Employment decision made without human review"
+    - id: "B2"
+      rule: "Protected class information used in screening"
+    - id: "B3"
+      rule: "Disability status disclosed without authorization"
+    - id: "B4"
+      rule: "Salary history inquiry where prohibited by law"
+    - id: "B5"
+      rule: "Age, gender, race, or other protected class considered"
+    - id: "B6"
+      rule: "Medical information accessed improperly"
+    - id: "B7"
+      rule: "Retaliation indicated against complainant"
+    - id: "B8"
+      rule: "Bias audit not completed for automated decision tool"
+
+accountability:
+  approved_by: "Chief Human Resources Officer"
+  answerable_human: "hr-compliance@company.com"
+  escalation_path:
+    - "HR Business Partner"
+    - "HR Manager"
+    - "Director of HR"
+    - "Chief Human Resources Officer"
+    - "General Counsel"
+  review_cadence: quarterly
+
+acceptance:
+  fit_criteria:
+    - id: "F1"
+      rule: "Information aligns with current company policies"
+    - id: "F2"
+      rule: "Response is consistent across similar inquiries"
+    - id: "F3"
+      rule: "Legal disclaimers included where appropriate"
+    - id: "F4"
+      rule: "AI involvement disclosed in hiring processes"
+    - id: "F5"
+      rule: "Bias audit results available for review"
+    - id: "F6"
+      rule: "Adverse impact analysis conducted"
+
+  dignity_check:
+    - id: "D1"
+      rule: "Does not make assumptions about candidate qualifications"
+    - id: "D2"
+      rule: "Treats all candidates with equal respect"
+    - id: "D3"
+      rule: "Does not use manipulative language about job opportunity"
+    - id: "D4"
+      rule: "Preserves candidate right to human interaction"
+    - id: "D5"
+      rule: "Respects employee privacy in communications"
+    - id: "D6"
+      rule: "Does not pressure candidates about timeline decisions"

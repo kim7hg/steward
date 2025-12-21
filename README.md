@@ -112,12 +112,29 @@ accountability:
 
 ---
 
+## Domain Packs
+
+Ready-to-use contracts for regulated industries with compliance mapping:
+
+| Domain | Contract | Regulations |
+|--------|----------|-------------|
+| **Healthcare** | [healthcare.yaml](contracts/healthcare.yaml) | HIPAA, GINA, 42 CFR Part 2 |
+| **Finance** | [finance.yaml](contracts/finance.yaml) | SEC Reg BI, Advisers Act, FINRA |
+| **Legal** | [legal.yaml](contracts/legal.yaml) | ABA Model Rules, Privilege |
+| **Education** | [education.yaml](contracts/education.yaml) | FERPA, COPPA, IDEA |
+| **HR** | [hr.yaml](contracts/hr.yaml) | Title VII, ADA, EEOC AI Guidance |
+
+See [Compliance Mapping](docs/compliance-mapping.md) for detailed regulatory coverage.
+
+---
+
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
 | [Steward Design](docs/Steward.md) | Architecture, governance calculus, and lens specifications |
 | [Blueprint Specs](docs/steward-blueprint-specs.md) | Authoritative specification |
+| [Compliance Mapping](docs/compliance-mapping.md) | Regulatory requirements by domain |
 | [Contract Schema](spec/contract.schema.json) | JSON Schema for contracts |
 
 ---
