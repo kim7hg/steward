@@ -721,6 +721,9 @@ steward evaluate --contract contract.yaml --output output.json --format text
 # Explain mode (human-readable summary)
 steward evaluate --contract contract.yaml --output output.json --explain
 
+# Deterministic evaluation with fixed timestamp (for golden tests, audits)
+steward evaluate --contract contract.yaml --output output.json --evaluated-at "2025-12-20T10:00:00Z"
+
 # Contract management
 steward contract validate contract.yaml
 steward contract show contract.yaml

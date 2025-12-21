@@ -7,9 +7,10 @@
 
 use lazy_static::lazy_static;
 
+use crate::contract::content_matches_any_rule;
 use crate::evidence::Evidence;
 use crate::types::{
-    EvaluationRequest, LensFinding, LensState, LensType, RuleEvaluation, RuleResult,
+    EvaluationRequest, LensFinding, LensState, LensType, RuleEvaluation, RuleResult, RuleType,
 };
 
 use super::patterns::{
@@ -173,29 +174,59 @@ impl BoundariesLens {
     /// Returns Some((rule_id, violation_description, evidence)) if output is OUT OF SCOPE.
     ///
     /// Per spec: "Output operates outside boundaries.may_do_autonomously[]" triggers BLOCKED.
+    ///
+    /// ## True Allowlist Implementation
+    ///
+    /// This function implements a **positive scope check**:
+    /// 1. If `may_do_autonomously` is empty AND not strict → permissive (backward compat)
+    /// 2. If `may_do_autonomously` is empty AND strict → BLOCKED (nothing allowed)
+    /// 3. If `may_do_autonomously` has rules AND output matches at least one → PASS
+    /// 4. If `may_do_autonomously` has rules AND output matches NONE:
+    ///    - Default mode: only block known dangerous content
+    ///    - Strict mode: BLOCKED (true allowlist)
+    ///
+    /// The risky content checks (financial/medical/legal advice) remain as a safety net
+    /// for cases where the allowlist check passes but dangerous content is detected.
     fn check_autonomous_scope(
         &self,
         content: &str,
         allowed_rules: &[crate::contract::Rule],
+        strict_scope_mode: bool,
     ) -> Option<(String, String, Vec<Evidence>)> {
-        // If no may_do_autonomously rules defined, everything is allowed (permissive default)
+        // Handle empty may_do_autonomously
         if allowed_rules.is_empty() {
+            if strict_scope_mode {
+                // Strict mode with no allowed rules = BLOCK everything
+                let evidence = vec![Evidence::from_output(
+                    "No may_do_autonomously rules defined in strict_scope_mode",
+                    0,
+                    content.len().min(100),
+                )];
+                return Some((
+                    "SCOPE_VIOLATION".to_string(),
+                    "Output blocked: strict_scope_mode enabled but no may_do_autonomously rules defined".to_string(),
+                    evidence,
+                ));
+            }
+            // Default: permissive when no rules defined
             return None;
         }
 
+        // TRUE ALLOWLIST CHECK
+        // Use keyword extraction to determine if output semantically aligns with allowed scope
+        let matches_allowed_scope = content_matches_any_rule(content, allowed_rules);
+
         let content_lower = content.to_lowercase();
 
-        // Check for content that falls OUTSIDE defined scope
-        // This is a negative check: we look for disallowed patterns
+        // Check for dangerous content types that should always be blocked unless explicitly allowed
 
-        // Financial/investment advice check (unless explicitly allowed)
+        // Financial/investment advice check
         let allows_financial = allowed_rules.iter().any(|r| {
             let text = r.rule.to_lowercase();
             text.contains("financial") || text.contains("invest")
         });
 
         if !allows_financial && self.check_keywords(&content_lower, &INVESTMENT_ADVICE_PATTERNS) {
-            // Check if it's actually giving advice vs just mentioning
             if self.appears_to_give_advice(content) {
                 let evidence = vec![Evidence::from_output(
                     "Output contains financial/investment advice outside allowed scope",
@@ -210,7 +241,7 @@ impl BoundariesLens {
             }
         }
 
-        // Medical advice check (unless explicitly allowed)
+        // Medical advice check
         let allows_medical = allowed_rules.iter().any(|r| {
             let text = r.rule.to_lowercase();
             text.contains("medical") || text.contains("health")
@@ -229,7 +260,7 @@ impl BoundariesLens {
             ));
         }
 
-        // Legal advice check (unless explicitly allowed)
+        // Legal advice check
         let allows_legal = allowed_rules.iter().any(|r| {
             let text = r.rule.to_lowercase();
             text.contains("legal")
@@ -244,6 +275,21 @@ impl BoundariesLens {
             return Some((
                 "SCOPE_VIOLATION".to_string(),
                 "Output operates outside boundaries.may_do_autonomously[] - contains legal advice".to_string(),
+                evidence,
+            ));
+        }
+
+        // STRICT SCOPE MODE
+        // If strict mode is enabled and output doesn't match any allowed rule, BLOCK
+        if strict_scope_mode && !matches_allowed_scope {
+            let evidence = vec![Evidence::from_output(
+                "Output does not match any may_do_autonomously rule (strict_scope_mode)",
+                0,
+                content.len().min(100),
+            )];
+            return Some((
+                "SCOPE_VIOLATION".to_string(),
+                "Output operates outside boundaries.may_do_autonomously[] - no matching allowed scope rule (strict_scope_mode)".to_string(),
                 evidence,
             ));
         }
@@ -286,7 +332,11 @@ impl Lens for BoundariesLens {
         // 0. Check may_do_autonomously FIRST (scope check)
         // Per spec: "Output operates outside boundaries.may_do_autonomously[]" triggers BLOCKED
         if let Some((rule_id, violation, evidence)) =
-            self.check_autonomous_scope(content, &contract.boundaries.may_do_autonomously)
+            self.check_autonomous_scope(
+                content,
+                &contract.boundaries.may_do_autonomously,
+                contract.boundaries.strict_scope_mode,
+            )
         {
             rules_evaluated.push(RuleEvaluation {
                 rule_id: rule_id.clone(),
@@ -428,15 +478,45 @@ impl Lens for BoundariesLens {
                 break;
             }
 
-            // If not matched, mark as satisfied
+            // If not matched by any deterministic pattern, classify the rule
+            // and handle non-deterministic rules appropriately
             if blocked_violation.is_none() && escalate_reason.is_none() {
-                rules_evaluated.push(RuleEvaluation {
-                    rule_id: rule.id.clone(),
-                    rule_text: Some(rule.rule.clone()),
-                    result: RuleResult::Satisfied,
-                    evidence: vec![],
-                    rationale: None,
-                });
+                let rule_type = RuleType::classify(&rule.rule);
+
+                match rule_type {
+                    RuleType::Deterministic => {
+                        // We checked all deterministic patterns above and none matched
+                        // This means the rule is satisfied (no violation detected)
+                        rules_evaluated.push(RuleEvaluation {
+                            rule_id: rule.id.clone(),
+                            rule_text: Some(rule.rule.clone()),
+                            result: RuleResult::Satisfied,
+                            evidence: vec![],
+                            rationale: Some("No violation detected by pattern matching".to_string()),
+                        });
+                    }
+                    RuleType::Interpretive | RuleType::Unknown => {
+                        // Cannot evaluate deterministically - mark as Uncertain
+                        // This triggers ESCALATE via the honesty rule
+                        rules_evaluated.push(RuleEvaluation {
+                            rule_id: rule.id.clone(),
+                            rule_text: Some(rule.rule.clone()),
+                            result: RuleResult::Uncertain,
+                            evidence: vec![],
+                            rationale: Some(format!(
+                                "Rule requires human judgment (type: {:?})",
+                                rule_type
+                            )),
+                        });
+
+                        if escalate_reason.is_none() {
+                            escalate_reason = Some(format!(
+                                "Rule {} requires human judgment: {}",
+                                rule.id, rule.rule
+                            ));
+                        }
+                    }
+                }
             }
         }
 
@@ -517,6 +597,9 @@ impl Lens for BoundariesLens {
         }
 
         // 3. Check must_pause_when rules
+        // Track pause violations separately for strict_pause_mode handling
+        let mut pause_violation: Option<(String, String, Vec<Evidence>)> = None;
+
         for rule in &contract.boundaries.must_pause_when {
             let rule_lower = rule.rule.to_lowercase();
 
@@ -524,20 +607,32 @@ impl Lens for BoundariesLens {
             if rule_lower.contains("frustrat") || rule_lower.contains("anger") {
                 for (idx, ctx) in context.iter().enumerate() {
                     if self.check_keywords(ctx, &FRUSTRATION_KEYWORDS) {
+                        let evidence = vec![Evidence::from_context(
+                            "Customer frustration detected",
+                            idx,
+                            0,
+                            ctx.len().min(50),
+                        )];
+
                         rules_evaluated.push(RuleEvaluation {
                             rule_id: rule.id.clone(),
                             rule_text: Some(rule.rule.clone()),
                             result: RuleResult::Uncertain,
-                            evidence: vec![Evidence::from_context(
-                                "Customer frustration detected",
-                                idx,
-                                0,
-                                ctx.len().min(50),
-                            )],
+                            evidence: evidence.clone(),
                             rationale: Some("Frustration keywords detected in context".to_string()),
                         });
 
-                        if escalate_reason.is_none() {
+                        // In strict mode, pause triggers cause BLOCKED
+                        if contract.boundaries.strict_pause_mode {
+                            if pause_violation.is_none() {
+                                pause_violation = Some((
+                                    rule.id.clone(),
+                                    rule.rule.clone(),
+                                    evidence,
+                                ));
+                            }
+                        } else if escalate_reason.is_none() {
+                            // Default behavior: ESCALATE
                             escalate_reason = Some(format!(
                                 "Customer frustration detected (rule {})",
                                 rule.id
@@ -547,6 +642,19 @@ impl Lens for BoundariesLens {
                     }
                 }
             }
+        }
+
+        // In strict_pause_mode, pause triggers return BLOCKED
+        if let Some((rule_id, rule_text, _evidence)) = pause_violation {
+            return LensFinding {
+                lens: Some(LensType::BoundariesSafety),
+                question_asked: Some(self.question().to_string()),
+                state: LensState::Blocked {
+                    violation: format!("{}: {} (strict_pause_mode)", rule_id, rule_text),
+                },
+                rules_evaluated,
+                confidence: 0.95,
+            };
         }
 
         // Build final finding
@@ -724,7 +832,7 @@ accountability:
         assert!(finding.state.is_escalate());
     }
 
-    // FIX-002 Tests: invalidated_by must always return BLOCKED
+    // Tests: invalidated_by must always return BLOCKED
 
     #[test]
     fn test_medical_advice_blocked_not_escalated() {
@@ -838,7 +946,7 @@ accountability:
         assert_eq!(violated.unwrap().rule_id, "B3");
     }
 
-    // FIX-001 Tests: may_do_autonomously scope checking
+    // Tests: may_do_autonomously scope checking
 
     #[test]
     fn test_output_within_scope_proceeds() {
@@ -945,5 +1053,342 @@ accountability:
 
         // Financial advice is explicitly allowed
         assert!(finding.state.is_pass(), "Financial advice should PASS when explicitly allowed");
+    }
+
+    // Tests: Rule type classification for invalidated_by rules
+
+    #[test]
+    fn test_interpretive_rule_triggers_escalate() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Customer support"
+boundaries:
+  invalidated_by:
+    - id: "B3"
+      rule: "System cannot verify accuracy of claim"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let request = create_test_request(
+            contract,
+            "Based on our records, your package shipped yesterday."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // Interpretive rules should trigger ESCALATE, not auto-satisfy
+        assert!(finding.state.is_escalate(),
+            "Interpretive rule should trigger ESCALATE, not PASS. Got: {:?}", finding.state);
+
+        // Verify the rule was marked as Uncertain
+        let uncertain_rule = finding.rules_evaluated.iter()
+            .find(|r| r.rule_id == "B3");
+        assert!(uncertain_rule.is_some());
+        assert_eq!(uncertain_rule.unwrap().result, RuleResult::Uncertain);
+    }
+
+    #[test]
+    fn test_unknown_rule_type_triggers_escalate() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Customer support"
+boundaries:
+  invalidated_by:
+    - id: "B4"
+      rule: "Output contains unsubstantiated promises"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let request = create_test_request(
+            contract,
+            "Your order will arrive by tomorrow guaranteed."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // Unknown rule types should trigger ESCALATE
+        assert!(finding.state.is_escalate(),
+            "Unknown rule type should trigger ESCALATE. Got: {:?}", finding.state);
+    }
+
+    #[test]
+    fn test_deterministic_rule_without_violation_satisfied() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Customer support"
+boundaries:
+  invalidated_by:
+    - id: "B1"
+      rule: "Customer PII exposed in response"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let request = create_test_request(
+            contract,
+            "Your order is on its way. No personal information here."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // Deterministic rule without violation should be Satisfied
+        assert!(finding.state.is_pass());
+
+        let pii_rule = finding.rules_evaluated.iter()
+            .find(|r| r.rule_id == "B1");
+        assert!(pii_rule.is_some());
+        assert_eq!(pii_rule.unwrap().result, RuleResult::Satisfied);
+    }
+
+    #[test]
+    fn test_mixed_rule_types_most_severe_wins() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Customer support"
+boundaries:
+  invalidated_by:
+    - id: "B1"
+      rule: "Customer PII exposed in response"
+    - id: "B3"
+      rule: "System cannot verify accuracy of claim"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        // Output with PII exposure - should BLOCK even though B3 would ESCALATE
+        let request = create_test_request(
+            contract,
+            "Your email john@example.com is confirmed."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // BLOCKED takes priority over ESCALATE
+        assert!(finding.state.is_blocked(),
+            "BLOCKED should take priority. Got: {:?}", finding.state);
+    }
+
+    // Tests: strict_pause_mode
+
+    #[test]
+    fn test_pause_trigger_default_escalates() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Customer support"
+boundaries:
+  must_pause_when:
+    - id: "P1"
+      rule: "Customer expresses frustration"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let mut request = create_test_request(contract, "I understand your concern.");
+        request.context = Some(vec!["I'm so frustrated with this service!".to_string()]);
+
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // Default behavior: ESCALATE, not BLOCKED
+        assert!(finding.state.is_escalate(),
+            "Default pause trigger should ESCALATE. Got: {:?}", finding.state);
+    }
+
+    #[test]
+    fn test_strict_pause_mode_blocks() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Customer support"
+boundaries:
+  strict_pause_mode: true
+  must_pause_when:
+    - id: "P1"
+      rule: "Customer expresses frustration"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let mut request = create_test_request(contract, "I understand your concern.");
+        request.context = Some(vec!["I'm furious about this!".to_string()]);
+
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // Strict mode: BLOCKED instead of ESCALATE
+        assert!(finding.state.is_blocked(),
+            "strict_pause_mode should cause BLOCKED. Got: {:?}", finding.state);
+
+        // Verify the violation mentions strict_pause_mode
+        if let LensState::Blocked { violation } = &finding.state {
+            assert!(violation.contains("strict_pause_mode"),
+                "Violation should mention strict_pause_mode: {}", violation);
+        }
+    }
+
+    #[test]
+    fn test_strict_pause_mode_no_trigger_passes() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Customer support"
+boundaries:
+  strict_pause_mode: true
+  must_pause_when:
+    - id: "P1"
+      rule: "Customer expresses frustration"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let mut request = create_test_request(contract, "Your order shipped yesterday.");
+        request.context = Some(vec!["Thanks for the update!".to_string()]);
+
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // No pause trigger detected - should pass
+        assert!(finding.state.is_pass(),
+            "No pause trigger should PASS. Got: {:?}", finding.state);
+    }
+
+    // Tests: strict_scope_mode
+
+    #[test]
+    fn test_strict_scope_mode_empty_rules_blocks_all() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Test"
+boundaries:
+  strict_scope_mode: true
+  may_do_autonomously: []
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let request = create_test_request(
+            contract,
+            "Your order shipped yesterday."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // strict_scope_mode with empty may_do_autonomously blocks everything
+        assert!(finding.state.is_blocked(),
+            "strict_scope_mode with empty rules should BLOCK. Got: {:?}", finding.state);
+
+        if let LensState::Blocked { violation } = &finding.state {
+            assert!(violation.contains("strict_scope_mode"),
+                "Violation should mention strict_scope_mode: {}", violation);
+        }
+    }
+
+    #[test]
+    fn test_strict_scope_mode_no_match_blocks() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Test"
+boundaries:
+  strict_scope_mode: true
+  may_do_autonomously:
+    - id: "A1"
+      rule: "Answer questions about shipping status"
+    - id: "A2"
+      rule: "Provide tracking information"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let request = create_test_request(
+            contract,
+            "Our company was founded in 1990 and has grown significantly over the years."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // strict_scope_mode blocks output that doesn't match any allowed rule
+        assert!(finding.state.is_blocked(),
+            "strict_scope_mode should BLOCK unmatched output. Got: {:?}", finding.state);
+
+        if let LensState::Blocked { violation } = &finding.state {
+            assert!(violation.contains("strict_scope_mode"),
+                "Violation should mention strict_scope_mode: {}", violation);
+        }
+    }
+
+    #[test]
+    fn test_strict_scope_mode_match_passes() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Test"
+boundaries:
+  strict_scope_mode: true
+  may_do_autonomously:
+    - id: "A1"
+      rule: "Answer questions about order and shipping status"
+    - id: "A2"
+      rule: "Provide tracking information"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let request = create_test_request(
+            contract,
+            "Your order #12345 shipped yesterday. You can track it at the link in your email."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // Output matching allowed rules should pass even in strict mode
+        assert!(finding.state.is_pass(),
+            "strict_scope_mode should PASS matching output. Got: {:?}", finding.state);
+    }
+
+    #[test]
+    fn test_default_scope_mode_permissive() {
+        let contract = r#"
+contract_version: "1.0"
+schema_version: "2025-12-20"
+name: "Test"
+intent:
+  purpose: "Test"
+boundaries:
+  may_do_autonomously:
+    - id: "A1"
+      rule: "Answer questions about shipping"
+accountability:
+  answerable_human: "test@example.com"
+"#;
+        let request = create_test_request(
+            contract,
+            "Our company was founded in 1990. We have offices worldwide."
+        );
+        let lens = BoundariesLens::new();
+        let finding = lens.evaluate(&request);
+
+        // Default mode: allow non-matching output (backward compat)
+        // Only blocks known dangerous content (financial/medical/legal advice)
+        assert!(finding.state.is_pass(),
+            "Default mode should PASS non-matching harmless output. Got: {:?}", finding.state);
     }
 }

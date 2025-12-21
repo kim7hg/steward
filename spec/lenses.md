@@ -111,6 +111,68 @@ return PASS
 - BLOCKED must cite both the violated rule and the location in output
 - ESCALATE must include the specific condition that triggered it
 
+### Strict Mode Options
+
+The Boundaries lens supports two strict mode options for organizations requiring stricter enforcement:
+
+#### `strict_pause_mode`
+
+Controls how `must_pause_when` triggers are handled:
+
+| Mode | Behavior |
+|------|----------|
+| `false` (default) | Pause triggers return **ESCALATE** for human review |
+| `true` | Pause triggers return **BLOCKED** - automation must halt |
+
+**Rationale**: By default, `must_pause_when` triggers result in ESCALATE because the lens
+evaluates a single output and cannot determine if the system "ignored" a pause condition.
+ESCALATE surfaces the trigger for human review. For organizations requiring strict
+interpretation where any pause trigger means the automation must halt, enable
+`strict_pause_mode: true`.
+
+**Example contract**:
+```yaml
+boundaries:
+  strict_pause_mode: true
+  must_pause_when:
+    - id: "P1"
+      rule: "Customer expresses frustration"
+```
+
+When frustration is detected with `strict_pause_mode: true`, the result is BLOCKED
+(not ESCALATE), forcing the automation to stop immediately.
+
+#### `strict_scope_mode`
+
+Controls how `may_do_autonomously` scope checking works:
+
+| Mode | Behavior |
+|------|----------|
+| `false` (default) | Permissive - only blocks known dangerous content (financial/medical/legal advice) |
+| `true` | True allowlist - output that doesn't match ANY rule is **BLOCKED** |
+
+**Rationale**: Per the spec, "Output operates outside boundaries.may_do_autonomously[]"
+should trigger BLOCKED. However, semantic matching can produce false positives. The
+default mode uses keyword extraction but only blocks known dangerous patterns. For
+organizations requiring true allowlist behavior, enable `strict_scope_mode: true`.
+
+**Note**: When `strict_scope_mode: true` and `may_do_autonomously` is empty, ALL
+outputs are BLOCKED (nothing is explicitly allowed).
+
+**Example contract**:
+```yaml
+boundaries:
+  strict_scope_mode: true
+  may_do_autonomously:
+    - id: "A1"
+      rule: "Answer questions about shipping status"
+    - id: "A2"
+      rule: "Provide tracking information"
+```
+
+With `strict_scope_mode: true`, any output that doesn't semantically match shipping
+or tracking topics will be BLOCKED.
+
 ### Pattern Matching (Phase 1)
 
 For deterministic evaluation without LLM, Boundaries lens uses pattern matching:

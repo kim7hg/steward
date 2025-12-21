@@ -138,6 +138,16 @@
           "items": {
             "$ref": "#/$defs/Rule"
           }
+        },
+        "strict_pause_mode": {
+          "type": "boolean",
+          "description": "If true, pause triggers result in BLOCKED instead of ESCALATE. Use for strict interpretation where any pause trigger means automation must halt.",
+          "default": false
+        },
+        "strict_scope_mode": {
+          "type": "boolean",
+          "description": "If true, output that doesn't match ANY may_do_autonomously rule is BLOCKED. Enforces true allowlist behavior per spec. When enabled with empty may_do_autonomously, ALL outputs are BLOCKED.",
+          "default": false
         }
       }
     },

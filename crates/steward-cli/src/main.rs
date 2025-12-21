@@ -26,6 +26,7 @@
 //! - 3: Error
 
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 use std::io::{self, Read};
 use std::path::PathBuf;
@@ -67,6 +68,12 @@ enum Commands {
         /// Context to include (can be specified multiple times)
         #[arg(long)]
         context: Vec<String>,
+
+        /// Explicit timestamp for deterministic evaluation (ISO 8601 / RFC 3339).
+        /// Use for reproducible results in golden tests, audits, or debugging.
+        /// Example: --evaluated-at 2025-12-20T00:00:00Z
+        #[arg(long, value_parser = parse_datetime)]
+        evaluated_at: Option<DateTime<Utc>>,
     },
 
     /// Contract management commands
@@ -104,6 +111,14 @@ enum OutputFormat {
     Json,
 }
 
+/// Parse ISO 8601 / RFC 3339 datetime string to DateTime<Utc>.
+/// Supports both "2025-12-20T00:00:00Z" and "2025-12-20T00:00:00+00:00" formats.
+fn parse_datetime(s: &str) -> Result<DateTime<Utc>, String> {
+    DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|e| format!("Invalid datetime format: {}. Expected ISO 8601/RFC 3339 (e.g., 2025-12-20T00:00:00Z)", e))
+}
+
 fn main() -> ExitCode {
     // Initialize logging
     tracing_subscriber::fmt()
@@ -132,7 +147,8 @@ fn run() -> Result<ExitCode> {
             format,
             explain,
             context,
-        } => evaluate_command(contract, output, format, explain, context),
+            evaluated_at,
+        } => evaluate_command(contract, output, format, explain, context, evaluated_at),
 
         Commands::Contract { action } => match action {
             ContractAction::Validate { path } => validate_contract(path),
@@ -148,6 +164,7 @@ fn evaluate_command(
     format: OutputFormat,
     explain: bool,
     context: Vec<String>,
+    evaluated_at: Option<DateTime<Utc>>,
 ) -> Result<ExitCode> {
     // Load contract
     let contract = if contract_path.extension().map(|e| e == "json").unwrap_or(false) {
@@ -181,9 +198,17 @@ fn evaluate_command(
         Some(&context)
     };
 
-    // Evaluate
-    let result = steward_core::evaluate_with_context(&contract, &output, context_ref, None)
-        .context("Evaluation failed")?;
+    // Evaluate with explicit timestamp if provided, otherwise use current time
+    let result = match evaluated_at {
+        Some(timestamp) => {
+            steward_core::evaluate_with_context_at(&contract, &output, context_ref, None, timestamp)
+                .context("Evaluation failed")?
+        }
+        None => {
+            steward_core::evaluate_with_context(&contract, &output, context_ref, None)
+                .context("Evaluation failed")?
+        }
+    };
 
     // Output results
     match format {

@@ -88,6 +88,36 @@ pub struct Boundaries {
     /// Conditions that invalidate automation entirely
     #[serde(default)]
     pub invalidated_by: Vec<Rule>,
+
+    /// Strict pause mode - if true, pause triggers result in BLOCKED instead of ESCALATE.
+    ///
+    /// ## Rationale
+    ///
+    /// By default, `must_pause_when` triggers result in ESCALATE because the lens evaluates
+    /// a single output and cannot determine if the system "ignored" a pause condition.
+    /// ESCALATE surfaces the trigger for human review.
+    ///
+    /// For organizations requiring strict interpretation where any pause trigger means
+    /// the automation must halt, set `strict_pause_mode: true`.
+    #[serde(default)]
+    pub strict_pause_mode: bool,
+
+    /// Strict scope mode - if true, output that doesn't match ANY `may_do_autonomously`
+    /// rule is BLOCKED (true allowlist behavior).
+    ///
+    /// ## Rationale
+    ///
+    /// By default, `may_do_autonomously` uses semantic keyword matching but only blocks
+    /// known dangerous patterns (financial/medical/legal advice) to avoid false positives.
+    ///
+    /// For organizations requiring strict interpretation where output MUST match at least
+    /// one allowed scope rule, set `strict_scope_mode: true`. This enforces the spec's
+    /// true allowlist behavior: "operates outside may_do_autonomously => BLOCKED".
+    ///
+    /// Note: When `strict_scope_mode` is true and `may_do_autonomously` is empty,
+    /// ALL outputs are BLOCKED (nothing is explicitly allowed).
+    #[serde(default)]
+    pub strict_scope_mode: bool,
 }
 
 /// Accountability section of a contract.
@@ -323,7 +353,7 @@ impl Contract {
                 .filter(|r| Self::is_dignity_related(&r.rule)),
         );
 
-        // FIX-003: Include dignity-related rules from must_escalate_when
+        // Include dignity-related rules from must_escalate_when
         rules.extend(
             self.boundaries
                 .must_escalate_when
@@ -415,7 +445,7 @@ accountability:
         ));
     }
 
-    // FIX-003: Dignity lens must evaluate must_escalate_when[] (dignity-related)
+    // Dignity lens must evaluate must_escalate_when[] (dignity-related)
     #[test]
     fn test_dignity_rules_includes_escalation_rules() {
         let yaml = r#"

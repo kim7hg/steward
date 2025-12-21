@@ -71,6 +71,8 @@ Contract + Output → [5 Lenses in parallel] → Synthesizer → PROCEED | ESCAL
 
 Human-authored contracts define criteria. Five lenses evaluate independently—no debate, no persuasion, no shared state. A deterministic synthesizer reduces findings to a verdict.
 
+LLMs assist evaluation. Policy decides outcomes.
+
 No scoring. No probabilistic judgment. No hidden discretion.
 
 ---
@@ -84,6 +86,17 @@ steward evaluate --contract contract.yaml --output response.txt --format json
 ```
 
 Exit codes: `0` PROCEED, `1` ESCALATE, `2` BLOCKED, `3` Error
+
+#### Deterministic Evaluation
+
+For reproducible results (golden tests, audits, debugging), use the `--evaluated-at` flag:
+
+```bash
+steward evaluate --contract contract.yaml --output response.txt \
+    --evaluated-at 2025-12-20T00:00:00Z
+```
+
+This produces identical JSON output for the same inputs, including the timestamp.
 
 ### Rust
 
@@ -99,6 +112,19 @@ match result.state {
     State::Escalate { decision_point, .. } => { /* present to human */ }
     State::Blocked { violation } => { /* stop, notify accountable_human */ }
 }
+```
+
+#### Deterministic Evaluation
+
+For reproducible results, use the `*_at` API variants:
+
+```rust
+use chrono::{DateTime, Utc};
+use steward_core::{Contract, Output, evaluate_at};
+
+let timestamp: DateTime<Utc> = "2025-12-20T00:00:00Z".parse()?;
+let result = evaluate_at(&contract, &output, timestamp)?;
+// result.evaluated_at is now 2025-12-20T00:00:00Z
 ```
 
 ### Python
@@ -225,6 +251,19 @@ Most AI safety tools answer: *"Is this output acceptable?"*
 Steward answers: *"Should this action occur at all, should a human intervene, or must automation stop—now?"*
 
 This distinction is architectural, not philosophical.
+
+---
+
+## Contract Validation
+
+Contracts are validated against a JSON Schema before parsing. Invalid contracts fail fast with clear error messages:
+
+```bash
+$ steward contract validate invalid.yaml
+Contract validation failed: Missing required field 'intent.purpose'
+```
+
+The schema is embedded at compile time from `spec/contract.schema.json`, ensuring validation works offline and matches the expected contract structure.
 
 ---
 

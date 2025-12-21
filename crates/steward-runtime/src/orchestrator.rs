@@ -161,7 +161,11 @@ impl RuntimeOrchestrator {
         };
 
         // Fan-in: Deterministic synthesis (NO LLM)
-        let result = self.synthesizer.synthesize(findings, contract);
+        // Use configured evaluated_at for reproducible results
+        let result = match self.config.determinism.evaluated_at {
+            Some(timestamp) => self.synthesizer.synthesize_at(findings, contract, timestamp),
+            None => self.synthesizer.synthesize(findings, contract),
+        };
 
         Ok(RuntimeResult {
             evaluation: result,

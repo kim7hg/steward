@@ -609,7 +609,7 @@ accountability:
         }
     }
 
-    // FIX-005 Tests: Evidence invariant for BLOCKED states
+    // Evidence invariant for BLOCKED states
 
     #[test]
     fn test_blocked_always_has_evidence() {

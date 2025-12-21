@@ -1,5 +1,6 @@
 //! Configuration for steward-runtime.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -58,6 +59,10 @@ pub struct RuntimeConfig {
     /// Fallback chain
     #[serde(default)]
     pub fallback: Vec<FallbackStrategy>,
+
+    /// Determinism configuration
+    #[serde(default)]
+    pub determinism: DeterminismConfig,
 }
 
 fn default_true() -> bool {
@@ -90,6 +95,7 @@ impl Default for RuntimeConfig {
                 FallbackStrategy::Deterministic,
                 FallbackStrategy::EscalateWithUncertainty,
             ],
+            determinism: DeterminismConfig::default(),
         }
     }
 }
@@ -292,6 +298,39 @@ impl Default for EarlyTerminationConfig {
     }
 }
 
+/// Determinism configuration for reproducible evaluations.
+///
+/// ## Purpose
+///
+/// This configuration ensures that runtime evaluations can be fully deterministic
+/// and reproducible, matching the CLI's `--evaluated-at` flag for parity.
+///
+/// ## Usage
+///
+/// For golden tests, audits, and reproducibility, set `evaluated_at` to a fixed timestamp:
+///
+/// ```yaml
+/// runtime:
+///   determinism:
+///     evaluated_at: "2025-12-20T10:00:00Z"
+/// ```
+///
+/// When `evaluated_at` is None (default), the current system time is used.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DeterminismConfig {
+    /// Fixed timestamp for evaluation.
+    ///
+    /// When set, this timestamp is used instead of the current system time.
+    /// This ensures deterministic, reproducible results for:
+    /// - Golden tests
+    /// - Audit trails
+    /// - Debugging and replay
+    ///
+    /// Format: ISO 8601 (e.g., "2025-12-20T10:00:00Z")
+    #[serde(default)]
+    pub evaluated_at: Option<DateTime<Utc>>,
+}
+
 /// Prompt caching configuration (Anthropic-specific).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptCachingConfig {
@@ -464,5 +503,40 @@ mod tests {
             config.lens_timeout(LensType::DignityInclusion),
             Duration::from_secs(10)
         );
+    }
+
+    #[test]
+    fn test_determinism_config_default() {
+        let config = DeterminismConfig::default();
+        assert!(config.evaluated_at.is_none());
+    }
+
+    #[test]
+    fn test_determinism_config_with_timestamp() {
+        use chrono::TimeZone;
+
+        let mut config = RuntimeConfig::default();
+        let fixed_time = Utc.with_ymd_and_hms(2025, 12, 20, 10, 0, 0).unwrap();
+        config.determinism.evaluated_at = Some(fixed_time);
+
+        assert_eq!(config.determinism.evaluated_at, Some(fixed_time));
+    }
+
+    #[test]
+    fn test_determinism_config_serialization() {
+        use chrono::TimeZone;
+
+        let mut config = RuntimeConfig::default();
+        let fixed_time = Utc.with_ymd_and_hms(2025, 12, 20, 10, 0, 0).unwrap();
+        config.determinism.evaluated_at = Some(fixed_time);
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("evaluated_at"));
+        assert!(json.contains("2025-12-20"));
+
+        // Deserialize back
+        let parsed: RuntimeConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.determinism.evaluated_at, Some(fixed_time));
     }
 }

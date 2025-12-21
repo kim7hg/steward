@@ -276,6 +276,92 @@ pub enum RuleResult {
     NotApplicable,
 }
 
+/// Classification of a rule for determining evaluation strategy.
+///
+/// Rules that cannot be pattern-matched should return `Uncertain`
+/// instead of being auto-satisfied. This type helps lenses determine how
+/// to handle different types of rules.
+///
+/// ## SOLID Rationale
+///
+/// - **SRP**: Classification logic is separate from evaluation logic
+/// - **OCP**: New rule types can be added without changing evaluation code
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuleType {
+    /// Can be evaluated deterministically via pattern matching.
+    /// Examples: PII detection, credential exposure, keyword matching.
+    Deterministic,
+
+    /// Requires human judgment or LLM interpretation.
+    /// Examples: "System cannot verify accuracy", "Response is appropriate".
+    Interpretive,
+
+    /// Cannot classify the rule; treat conservatively.
+    Unknown,
+}
+
+impl RuleType {
+    /// Classify a rule based on its text content.
+    ///
+    /// This uses keyword matching to determine if a rule can be evaluated
+    /// deterministically or requires human judgment.
+    pub fn classify(rule_text: &str) -> Self {
+        let text = rule_text.to_lowercase();
+
+        // Deterministic patterns - can be matched with regex/keywords
+        if text.contains("pii")
+            || text.contains("personal information")
+            || text.contains("personally identifiable")
+            || text.contains("credential")
+            || text.contains("secret")
+            || text.contains("api key")
+            || text.contains("password")
+            || text.contains("email address")
+            || text.contains("phone number")
+            || text.contains("social security")
+            || text.contains("credit card")
+        {
+            return RuleType::Deterministic;
+        }
+
+        // Advice detection - deterministic via keyword + pattern matching
+        if (text.contains("medical") && text.contains("advice"))
+            || (text.contains("legal") && text.contains("advice"))
+            || (text.contains("financial") && text.contains("advice"))
+        {
+            return RuleType::Deterministic;
+        }
+
+        // Interpretive patterns - require human judgment
+        if text.contains("verify")
+            || text.contains("accuracy")
+            || text.contains("accurate")
+            || text.contains("appropriate")
+            || text.contains("judgment")
+            || text.contains("reasonable")
+            || text.contains("subjective")
+            || text.contains("context-dependent")
+            || text.contains("quality")
+            || text.contains("tone")
+        {
+            return RuleType::Interpretive;
+        }
+
+        // Default to Unknown for conservative handling
+        RuleType::Unknown
+    }
+
+    /// Returns true if this rule type can be evaluated deterministically.
+    pub fn is_deterministic(&self) -> bool {
+        matches!(self, RuleType::Deterministic)
+    }
+
+    /// Returns true if this rule type requires escalation due to uncertainty.
+    pub fn requires_escalation(&self) -> bool {
+        matches!(self, RuleType::Interpretive | RuleType::Unknown)
+    }
+}
+
 /// Source of evidence.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EvidenceSource {

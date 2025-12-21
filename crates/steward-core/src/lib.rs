@@ -46,7 +46,7 @@ pub use lenses::{
 pub use synthesizer::Synthesizer;
 pub use types::{
     BoundaryViolation, ContentType, EvaluationRequest, EvaluationResult, EvidenceSource,
-    LensFindings, LensType, Output, RuleEvaluation, RuleResult, State,
+    LensFindings, LensType, Output, RuleEvaluation, RuleResult, RuleType, State,
 };
 
 use chrono::{DateTime, Utc};
@@ -69,6 +69,12 @@ pub enum EvaluationError {
 /// Evaluate an output against a stewardship contract.
 ///
 /// This is the main entry point for Steward evaluation.
+///
+/// # Determinism
+///
+/// This function uses the current system time for `evaluated_at`.
+/// For fully deterministic results (golden tests, audits), use
+/// [`evaluate_at`] or [`evaluate_with_context_at`] instead.
 ///
 /// # Arguments
 ///
